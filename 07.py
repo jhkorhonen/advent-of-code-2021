@@ -13,11 +13,9 @@ print(eval( lambda n: n, round(median(crabs)), crabs))
 
 # 2
 
-# illegal heuristic solution
-print(eval( lambda n: n * (n+1)/2.0, mean(crabs), crabs))         # individual objectives are not actually quadratic, 
-print(eval( lambda n: n * (n+1)/2.0, floor(mean(crabs)), crabs))  # so mean is not the optimum
-print(eval( lambda n: n * (n+1)/2.0, ceil(mean(crabs)), crabs))   # close enough though  ¯\_(ツ)_/¯
-
-# legal brute-force solution
-print(min( [eval( lambda n: n * (n+1)/2.0, i, crabs) for i in range(min(crabs),max(crabs)+1)] ))
-
+# the objective function fits between two with quadratics same leading coefficient and optimum at mean
+# one can choose the additive constants suitably to see that the optimum of objective is within +-1 of
+# the mean (though I did not write down the full proof, so check details)
+lower = eval( lambda n: n * (n+1)/2.0, floor(mean(crabs)), crabs)
+upper = eval( lambda n: n * (n+1)/2.0, ceil(mean(crabs)), crabs)
+print(round(min(lower,upper)))
