@@ -5,46 +5,26 @@ from math import prod
 # parsing
 
 data = read("09.txt")
-
 heights = [[int(c) for c in line.strip()] for line in data]
+lx,ly = len(heights[0]), len(heights)
 
-lx = len(heights[0])
-ly = len(heights)
-
-def neighbours(x,y):
-    nbs = []
-    if x > 0:
-        nbs.append((x-1, y))
-    if x < lx-1:
-        nbs.append((x+1, y))
-    if y > 0:
-        nbs.append((x, y-1))
-    if y < ly-1:
-        nbs.append((x, y+1))
-    return nbs
+def map_points(): return ((x,y) for x in range(lx) for y in range(ly))
+def on_map(x,y): return x >= 0 and x < lx and y >= 0 and y < ly
+def neighbours(x,y): return ( (x+dx,y+dy) for dx,dy in [(0,1), (1,0), (0,-1), (-1,0)] if on_map(x+dx,y+dy))
+def is_sink(x,y): return all(heights[x1][y1] > heights[x][y] for (x1,y1) in neighbours(x,y))
 
 # 1
 
-total_risk = 0
-for (x,y) in ((x,y) for x in range(lx) for y in range(ly)):
-    if all(heights[x1][y1] > heights[x][y] for (x1,y1) in neighbours(x,y)):
-        total_risk = total_risk + heights[x][y] + 1
-
-print(total_risk)
+print(sum( heights[x][y] + 1 for x,y in map_points() if is_sink(x,y) ))
 
 # 2
 
 low_points = 0
 basin_map = [[0 for x in range(lx) ] for y in range(ly)]
-
 queue = deque()
 
-# invariant: if (x,y) is or has been in queue, it has non-zero value in basin_map
-# -1 is ridge line
-# 0 is unvisited
-
-for (x,y) in ((x,y) for x in range(lx) for y in range(ly)):
-    if all(heights[x1][y1] > heights[x][y] for (x1,y1) in neighbours(x,y)):
+for (x,y) in map_points():
+    if is_sink(x,y):
         basin_map[x][y] = low_points + 1
         low_points = low_points + 1
         queue.append((x,y))
