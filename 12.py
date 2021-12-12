@@ -79,8 +79,9 @@ class multilinear:
         new_values = defaultdict(int)
         for s1, v1 in self.values.items():
             for s2, v2 in other.values.items():
-                if s1.isdisjoint(s2) and v1*v2 != 0:
-                    new_values[frozenset(s1 | s2)] += v1*v2
+                s_new = s1 + s2
+                if len(s_new) == len(set(s_new)) and v1*v2 != 0:
+                    new_values[tuple(sorted(s_new))] += v1*v2
         return self.__class__(new_values)
     
     def __eq__(self,other):
@@ -98,13 +99,13 @@ class multilinear:
     @classmethod
     def constant(cls,x):
         values = defaultdict(int)
-        values[frozenset()] = x
+        values[tuple()] = x
         return cls(values)
     
     @classmethod
     def mono(cls,variable,x):
         values = defaultdict(int)
-        values[frozenset([variable])] = x
+        values[tuple([variable])] = x
         return cls(values)
 
     @classmethod
@@ -137,20 +138,6 @@ class onedegreetwo(multilinear):
             return "0"
         else:
             return " + ".join([ str(v) + "·" + str(k) for k,v in self.values.items()])
-                
-    @classmethod
-    def constant(cls,x):
-        values = defaultdict(int)
-        values[tuple()] = x
-        return cls(values)
-    
-    @classmethod
-    def mono(cls,variable,x):
-        values = defaultdict(int)
-        values[tuple([variable])] = x
-        return cls(values)
-    
-# matrix operations
 
 # 1,2
 
@@ -165,15 +152,9 @@ for ring in [multilinear, onedegreetwo]:
         B[ni[v],ni[u]] = ring.mono(u,1) if issmall(u) else ring.one()
         B[ni[u],ni[v]] = ring.mono(v,1) if issmall(v) else ring.one()
     
-    current = A * B 
-    last = A
-    power, summed = B, B
-    i = 0
+    last, current = A, A * B 
     while not current == last:
-        summed = (power+I) * summed  
-        power = power * power
-        last = current
-        current = A * (summed + I)
+        last, current = current, current * B + A
       
     print(current[0,n-1].total())
 
