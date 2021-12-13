@@ -40,9 +40,7 @@ for fold in folds:
     axis, line = fold
     if axis == "x":
         current_points = {fold_x(p,line) for p in current_points}
-        print("x", line, len(current_points))
     if axis == "y":
         current_points = {fold_y(p,line) for p in current_points}
-        print("y", line, len(current_points))
 
 print_points(points)
