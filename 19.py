@@ -1,6 +1,7 @@
 import numpy as np
 from tools import read
 from itertools import groupby
+from collections import Counter
 
 # rotation matrices
 
@@ -40,13 +41,15 @@ rotations.extend([ A@B for B in [Ry, Ry@Ry@Ry] for A in repeat(Rz)  ]) # -> z, -
 
 # scanner pattern matching stuff
 
+def manhattan(x,y):
+    return np.sum(np.abs(x-y))
+
+def fingerprint(A):
+    return Counter( manhattan(A[:,i],A[:,j]) for i in range(A.shape[1]) for j in range(i+1,A.shape[1]))
+
 def count_matches(A, B):
     A_points = { tuple(A[:,i]) for i in range(A.shape[1])}
     B_points = { tuple(B[:,i]) for i in range(B.shape[1])}
-    
-    # A_points = { tuple([int(x) for x in A[:,i]]) for i in range(A.shape[1])}
-    # B_points = { tuple([int(x) for x in B[:,i]]) for i in range(B.shape[1])}
-    # print(A_points, B_points)
     return len(A_points & B_points)
 
 def try_shifts(A,B):
@@ -64,6 +67,16 @@ def try_rotations(A,B):
         matches, shift = try_shifts(A,C)
         if matches:
             return True, rot, shift
+    return False, None, None
+
+def check_overlap(A,B):
+    fp_B = fingerprint(B)
+    total = 0
+    for k,v in fingerprint(A).items():
+        total += min(v, fp_B[k])
+    
+    if total >= 6*11:
+        return try_rotations(A,B)
     return False, None, None
 
 
@@ -88,7 +101,7 @@ while len(unaligned_scanners) > 0:
     for s in unaligned_scanners:
         matched = False
         for t in aligned_scanners:
-            matched, rot, shift = try_rotations(t,s)
+            matched, rot, shift = check_overlap(t,s)
             if matched:
                 aligned_scanners.append(rot@s + shift[:,None])
                 scanner_positions.append(tuple(shift))
