@@ -1,6 +1,14 @@
 
 from tools import read
 from itertools import product
+import bisect 
+
+def index(a, x):
+    'Locate the leftmost value exactly equal to x'
+    i = bisect.bisect_left(a, x)
+    if i != len(a) and a[i] == x:
+        return i
+    return -1
 
 def intersects(cube1, cube2):
     for dim in range(3):
@@ -16,77 +24,66 @@ class grid:
         self.values = { p : initial_value for p in corners}
     
     def __getitem__(self,point):
+        if point in self.values:
+            return self.values[point]
         x, y, z = point
         if x < self.fences[0][0] or y < self.fences[1][0] or z < self.fences[2][0]:
             return 0
         if x >= self.fences[0][-1] or y >= self.fences[1][-1] or z >= self.fences[2][-1]:
             return 0
-        i, j, k = 0,0,0
-        while x >= self.fences[0][i]:
-            i += 1
-        i -= 1
-        while y >= self.fences[1][j]:
-            j += 1
-        j -= 1
-        while z >= self.fences[2][k]:
-            k += 1
-        k -= 1
-        # print(self.fences)
-        # print(point)
+            
+        indices = [0,0,0]
+        for dim in range(3):
+            indices[dim] = bisect.bisect_right(self.fences[dim], point[dim])-1
+        return self.values[tuple(self.fences[dim][indices[dim]] for dim in range(3))]
+            
+        i,j,k = indices
         return self.values[(self.fences[0][i], self.fences[1][j], self.fences[2][k])]
         
     def __setitem__(self,point, value):
         self.values[point] = value
 
-    # def get_cell(self,point):
-    
     def point_by_index(self,indices):
         i,j,k = indices
         return (self.fences[0][i],self.fences[1][j],self.fences[2][k])
 
-    def refine(self, point):
+    def refine(self, point):   
+        # had_already = [True, True, True]
         new_fences = []
         for dim in range(3):
-            if point[dim] in self.fences[dim]:
-                new_fences.append(self.fences[dim].copy())
+            if index(self.fences[dim], point[dim]) == -1:
+                # had_already[dim] = False
+                new_fences.append(sorted(self.fences[dim] + [point[dim]]))
             else:
-                new_fences.append(sorted(self.fences[dim].copy() + [point[dim]]))
-                
-        new_grid = grid(new_fences, 0)
-        for new_grid_point in new_grid.values.keys():
-            new_grid[new_grid_point] = self[new_grid_point]
+                new_fences.append(self.fences[dim])
         
-        # for (i, j, k) in product(range(len(new_grid.fences[0])-1), range(len(new_grid.fences[1])-1), range(len(new_grid.fences[2])-1) ):
-        #     p = new_grid.point_by_index((i,j,k))
-        #     if p in self.values:
-        #         new_grid[p] = self[p]
-        #     else:
-        #         pi, pj, pk = i, j, k
-        #         if i == 0 or j == 0 or k == 0:
-        #             new_grid[p] = 0
-        #         elif i == len(new_grid.fences[0])-1 or j == len(new_grid.fences[1])-1 or k == len(new_grid.fences[2])-1:
-        #             new_grid[p] = 0
-        #         else:
-        #             if not new_grid.fences[0][i] in self.fences[0]:
-        #                 pi = i - 1
-        #             if not new_grid.fences[1][j] in self.fences[1]:
-        #                 pj = j - 1
-        #             if not new_grid.fences[2][k] in self.fences[2]:
-        #                 pk = k -1
-        #             new_grid[p] = self[new_grid.point_by_index((pi,pj,pk))]
-        # # for p in new_grid.values.keys():
-        # #     if p in self.values.keys():
-        # #         new_grid[p] = self[p]
-        # #     else:
-        # #         done = False
-        # #         for dim in range(3):
-        # #             if p[dim] < self.fences[dim][0] or p[dim] >= self.fences[dim][-1]:
-        # #                 new_grid[p] = 0
-        # #                 done = True
-        # #                 break
-        # #         if not done:
-        # #             new_grid[p] = self[self.get_cell(p)]
-        return new_grid
+        new_values = {}
+
+        x1, y1, z1 = point        
+        point_prime = [x1, y1, z1]
+        for dim in range(3):
+            if point[dim] == new_fences[dim][-1]:
+                point_prime[dim] = new_fences[dim][-2]
+    
+        x1, y1, z1 = point_prime
+        new_values[(x1, y1, z1)] = self[(x1, y1, z1)]
+        for new_grid_point in { (x1,y,z) for y in self.fences[1][:-1] for z in self.fences[2][:-1]  }:
+            new_values[new_grid_point] = self[new_grid_point]
+        for new_grid_point in { (x,y1,z) for x in self.fences[0][:-1] for z in self.fences[2][:-1]  }:
+            new_values[new_grid_point] = self[new_grid_point]
+        for new_grid_point in { (x,y,z1) for x in self.fences[0][:-1] for y in self.fences[1][:-1]  }:
+            new_values[new_grid_point] = self[new_grid_point]
+        for new_grid_point in { (x1,y1,z) for z in self.fences[2][:-1]  }:
+            new_values[new_grid_point] = self[new_grid_point]
+        for new_grid_point in { (x,y1,z1) for x in self.fences[0][:-1]  }:
+            new_values[new_grid_point] = self[new_grid_point]
+        for new_grid_point in { (x1,y,z1) for y in self.fences[1][:-1]  }:
+            new_values[new_grid_point] = self[new_grid_point]
+        
+        
+        self.fences = new_fences
+        self.values.update(new_values)
+        return self
         
     def apply_cube(self,cube,value):
         xs = [x for x in self.fences[0] if cube[0][0]-1 <= x and x < cube[0][1] ]
@@ -135,7 +132,8 @@ for line in data:
 # 2, proper solution
 
 current_grid = grid([[0,10],[0,10],[0,10]],1)
-for cube in cubes[:20]:
+i = 0
+for cube in cubes:
     # print(current_grid.lit_count())
     switch, coordinates = cube
     switch = 1 if switch == "on" else 0
@@ -149,8 +147,11 @@ for cube in cubes[:20]:
     # print(current_grid.fences)
     # for k, v in current_grid.values.items():
     #     print(k,v)
-    print(current_grid.lit_count())
+    i += 1
+    print(i)
 
+print("done")
+print(current_grid.lit_count())
 # print(current_grid.lit_count())
 
 # class cube:
