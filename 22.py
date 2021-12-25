@@ -1,16 +1,6 @@
 
 from tools import read
 from math import prod
-from itertools import product
-import bisect 
-
-def index(a, x):
-    'Locate the leftmost value exactly equal to x'
-    i = bisect.bisect_left(a, x)
-    if i != len(a) and a[i] == x:
-        return i
-    return -1
-    
 
 class cube:
     def __init__(self, corners):
