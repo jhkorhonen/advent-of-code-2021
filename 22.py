@@ -1,5 +1,6 @@
 
 from tools import read
+from math import prod
 from itertools import product
 import bisect 
 
@@ -9,13 +10,52 @@ def index(a, x):
     if i != len(a) and a[i] == x:
         return i
     return -1
+    
 
-def intersects(cube1, cube2):
-    for dim in range(3):
-        if cube2[dim][1] < cube1[dim][0] or cube1[dim][0] < cube2[dim][0]:
-            return False
-    return True
-
+class cube:
+    def __init__(self, corners):
+        self.corners = corners
+        
+    def __hash__(self):
+        return hash(self.corners)
+        
+    def __eq__(self, other):
+        return self.corners == other.corners
+    
+    def meets(self,point):
+        for dim in range(3):
+            if point[dim] <= self.corners[0][dim] or self.corners[1][dim] <=  point[dim]:
+                return true
+        return False
+    
+    def get_fences(self,dim):
+        return (self.corners[0][dim], self.corners[1][dim])
+        
+    def bisect(self,split_dim,line,split_cube = None):
+        if line <= self.corners[0][split_dim] or self.corners[1][split_dim] <= line:
+            return {self}
+        if not split_cube is None and not self.intersects(split_cube):
+            return {self}
+        pairs = [[[self.corners[0][dim],self.corners[1][dim]]] for dim in range(3)]
+        pairs[split_dim] = [[self.corners[0][split_dim],line], [line, self.corners[1][split_dim]]]
+        new_cubes = set()
+        for p0 in pairs[0]:
+            for p1 in pairs[1]:
+                for p2 in pairs[2]:
+                    new_cubes.add( cube( ((p0[0], p1[0], p2[0]), (p0[1], p1[1], p2[1])) ))
+        return new_cubes
+    
+    def intersects(cube1,cube2):
+        for dim in range(3):
+            if cube2.corners[1][dim] <= cube1.corners[0][dim] or cube1.corners[1][dim] <= cube2.corners[0][dim]:
+                return False
+        return True
+    
+    def size(self):
+        return prod([ self.corners[1][dim] - self.corners[0][dim] for dim in range(3)])
+    
+    def __str__(self):
+        return str(self.corners)
 
 class grid:
     def __init__(self, fences, initial_value):
@@ -36,10 +76,7 @@ class grid:
         for dim in range(3):
             indices[dim] = bisect.bisect_right(self.fences[dim], point[dim])-1
         return self.values[tuple(self.fences[dim][indices[dim]] for dim in range(3))]
-            
-        i,j,k = indices
-        return self.values[(self.fences[0][i], self.fences[1][j], self.fences[2][k])]
-        
+                    
     def __setitem__(self,point, value):
         self.values[point] = value
 
@@ -108,58 +145,94 @@ data = read("22.input.txt")
 
 cubes = []
 for line in data:
-    switch, cube = line.split(" ")
-    coordinates = [ [int(p) for p in axis[2:].split("..")] for axis in cube.split(",")]
+    switch, coordinates_text = line.split(" ")
+    coordinates = [ [int(p) for p in axis[2:].split("..")] for axis in coordinates_text.split(",")]
     cubes.append([switch, coordinates])
-    
+#
 
 # 1, baby solution
 
-# init_area = [[[0 for _ in range(101)] for _ in range(101)]  for _ in range(101)]
-# for cube in cubes[:20]:
-#     switch, coordinates = cube
-#     switch = 1 if switch == "on" else 0
-#     xs, ys, zs = coordinates
-#     xs[1] += 1
-#     ys[1] += 1
-#     zs[1] += 1
-#     for x, y, z in product(range(*xs),range(*ys),range(*zs)):
-#         init_area[x+50][y+50][z+50] = switch
-#     print(sum(sum(sum(p) for p in l) for l in init_area))
-#
-# print(sum(sum(sum(p) for p in l) for l in init_area))
+init_area = [[[0 for _ in range(101)] for _ in range(101)]  for _ in range(101)]
+baby_solutions = []
+for c in cubes[:20]:
+    switch, coordinates = c
+    switch = 1 if switch == "on" else 0
+    xs, ys, zs = [l.copy() for l in coordinates]
+    xs[1] += 1
+    ys[1] += 1
+    zs[1] += 1
+    for x, y, z in product(range(*xs),range(*ys),range(*zs)):
+        init_area[x+50][y+50][z+50] = switch
+    print(sum(sum(sum(p) for p in l) for l in init_area))
+    baby_solutions.append(sum(sum(sum(p) for p in l) for l in init_area))
+
+print(sum(sum(sum(p) for p in l) for l in init_area))
+print("--")
 
 # 2, proper solution
 
-current_grid = grid([[0,10],[0,10],[0,10]],1)
-i = 0
-for cube in cubes:
-    # print(current_grid.lit_count())
-    switch, coordinates = cube
-    switch = 1 if switch == "on" else 0
-    current_grid = current_grid.refine(tuple(coordinates[dim][0]-1 for dim in range(3)))
-    # print(current_grid.lit_count())
-    current_grid = current_grid.refine(tuple(coordinates[dim][1] for dim in range(3)))
-    # print(current_grid.lit_count())
-    # for k, v in current_grid.values.items():
-    #     print(k,v)
-    current_grid.apply_cube(coordinates, switch)
-    # print(current_grid.fences)
-    # for k, v in current_grid.values.items():
-    #     print(k,v)
-    i += 1
-    print(i)
+def reformat_input(coordinates):
+    return ((coordinates[0][0],coordinates[1][0],coordinates[2][0]), (coordinates[0][1]+1,coordinates[1][1]+1,coordinates[2][1]+1))
 
-print("done")
-print(current_grid.lit_count())
-# print(current_grid.lit_count())
+def bisect_all(cubes, fences, bisect_cube = None):
+    current_cubes = cubes
+    for dim in range(3):
+        for f in fences[dim]:
+            new_cubes = set()
+            for c in current_cubes:
+                if not bisect_cube is None:
+                    new_cubes |= c.bisect(dim,f,bisect_cube)
+                else:
+                    new_cubes |= c.bisect(dim,f)
+            current_cubes = new_cubes
+    return current_cubes
 
-# class cube:
-#     def __init__(self, coordinates, lit):
-#         self.xs, self.ys, self,zs = coordinates
-#         self.lit = lit
+
+# test_cube = cube( ((0,0,0),(10,10,10)) )
+# print(sum( c.size() for c in test_cube.bisect(0,5)  ))
+
+
+cubes = [(c[0],reformat_input(c[1])) for c in cubes]
 #
-#     def split(self,other):
-#         cubes = [self,other]
+first_cube = cube(cubes[0][1])
+processed_cubes = { first_cube }
+fences = [first_cube.get_fences(dim) for dim in range(3)]
+
+
+
+
 #
-        
+t = 0
+print(sum(c.size() for c in processed_cubes))
+
+for line in cubes[1:20]:
+    t = t+1
+    switch, coords = line
+    added_cube = cube(coords)
+    added_fences = [added_cube.get_fences(dim) for dim in range(3)]
+    processed_cubes = bisect_all(processed_cubes,added_fences,added_cube)
+    if switch == "on":
+        new_processed_cubes = bisect_all([added_cube], fences)
+        processed_cubes = processed_cubes | new_processed_cubes
+        fences = [ sorted(list(set().union(fences[dim],added_fences[dim])) )  for dim in range(3) ]
+    if switch == "off":
+        processed_cubes = { c for c in processed_cubes if not c.intersects(added_cube)}
+        fences = [ sorted(list(set().union(fences[dim],added_fences[dim])) )  for dim in range(3) ]
+    print(baby_solutions[t] if t < 20 else "-", sum(c.size() for c in processed_cubes), switch, t)
+    # print(t, switch, len(processed_cubes))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
