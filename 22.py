@@ -1,6 +1,7 @@
 
 from tools import read
 from math import prod
+from itertools import product
 
 class cube:
     def __init__(self, corners):
